@@ -1,8 +1,7 @@
-import { Writable } from 'stream';
-import sax from 'sax';
-import { durationStr } from './parse-time';
-import { Parser } from './parser';
-
+import { Writable } from "stream-browserify";
+import sax from "sax";
+import { durationStr } from "./parse-time";
+import { Parser } from "./parser";
 
 /**
  * A wrapper around sax that emits segments.
@@ -13,7 +12,7 @@ export default class DashMPDParser extends Writable implements Parser {
   constructor(targetID?: string) {
     super();
     this._parser = sax.createStream(false, { lowercase: true });
-    this._parser.on('error', this.destroy.bind(this));
+    this._parser.on("error", this.destroy.bind(this));
 
     let lastTag: string | null;
     let currtime = 0;
@@ -37,18 +36,18 @@ export default class DashMPDParser extends Writable implements Parser {
         Number: seq,
         Time: currtime,
       };
-      return str.replace(/\$(\w+)\$/g, (m, p1) => context[p1] + '');
+      return str.replace(/\$(\w+)\$/g, (m, p1) => context[p1] + "");
     };
 
-    this._parser.on('opentag', (node) => {
+    this._parser.on("opentag", (node) => {
       switch (node.name) {
-        case 'mpd':
-          currtime =
-            node.attributes.availabilitystarttime ?
-              new Date(node.attributes.availabilitystarttime).getTime() : 0;
-          isStatic = node.attributes.type !== 'dynamic';
+        case "mpd":
+          currtime = node.attributes.availabilitystarttime
+            ? new Date(node.attributes.availabilitystarttime).getTime()
+            : 0;
+          isStatic = node.attributes.type !== "dynamic";
           break;
-        case 'period':
+        case "period":
           // Reset everything on <Period> tag.
           seq = 0;
           timescale = 1000;
@@ -58,62 +57,64 @@ export default class DashMPDParser extends Writable implements Parser {
           treeLevel = 0;
           periodStart = durationStr(node.attributes.start) || 0;
           break;
-        case 'segmentlist':
+        case "segmentlist":
           seq = parseInt(node.attributes.startnumber) || seq;
           timescale = parseInt(node.attributes.timescale) || timescale;
           duration = parseInt(node.attributes.duration) || duration;
           offset = parseInt(node.attributes.presentationtimeoffset) || offset;
           break;
-        case 'segmenttemplate':
+        case "segmenttemplate":
           segmentTemplate = node.attributes;
           seq = parseInt(node.attributes.startnumber) || seq;
           timescale = parseInt(node.attributes.timescale) || timescale;
           break;
-        case 'segmenttimeline':
-        case 'baseurl':
+        case "segmenttimeline":
+        case "baseurl":
           lastTag = node.name;
           break;
-        case 's':
+        case "s":
           timeline.push({
             duration: parseInt(node.attributes.d),
             repeat: parseInt(node.attributes.r),
             time: parseInt(node.attributes.t),
           });
           break;
-        case 'adaptationset':
-        case 'representation':
+        case "adaptationset":
+        case "representation":
           treeLevel++;
           if (targetID == null) {
             targetID = node.attributes.id;
           }
-          getSegments = node.attributes.id === targetID + '';
+          getSegments = node.attributes.id === targetID + "";
           if (getSegments) {
             if (periodStart) {
               currtime += periodStart;
             }
             if (offset) {
-              currtime -= offset / timescale * 1000;
+              currtime -= (offset / timescale) * 1000;
             }
-            this.emit('starttime', currtime);
+            this.emit("starttime", currtime);
           }
           break;
-        case 'initialization':
+        case "initialization":
           if (getSegments) {
-            this.emit('item', {
-              url: baseURL.filter(s => !!s).join('') + node.attributes.sourceurl,
+            this.emit("item", {
+              url:
+                baseURL.filter((s) => !!s).join("") + node.attributes.sourceurl,
               seq: seq,
               init: true,
               duration: 0,
             });
           }
           break;
-        case 'segmenturl':
+        case "segmenturl":
           if (getSegments) {
             gotSegments = true;
             let tl = timeline.shift();
-            let segmentDuration = (tl && tl.duration || duration) / timescale * 1000;
-            this.emit('item', {
-              url: baseURL.filter(s => !!s).join('') + node.attributes.media,
+            let segmentDuration =
+              (((tl && tl.duration) || duration) / timescale) * 1000;
+            this.emit("item", {
+              url: baseURL.filter((s) => !!s).join("") + node.attributes.media,
               seq: seq++,
               duration: segmentDuration,
             });
@@ -122,40 +123,44 @@ export default class DashMPDParser extends Writable implements Parser {
           break;
       }
     });
-    
+
     const onEnd = (): void => {
-      if (isStatic) { this.emit('endlist'); }
+      if (isStatic) {
+        this.emit("endlist");
+      }
       if (!getSegments) {
         this.destroy(Error(`Representation '${targetID}' not found`));
       } else {
-        this.emit('end');
+        this.emit("end");
       }
     };
 
-    this._parser.on('closetag', (tagName) => {
+    this._parser.on("closetag", (tagName) => {
       switch (tagName) {
-        case 'adaptationset':
-        case 'representation':
+        case "adaptationset":
+        case "representation":
           treeLevel--;
           if (segmentTemplate && timeline.length) {
             gotSegments = true;
             if (segmentTemplate.initialization) {
-              this.emit('item', {
-                url: baseURL.filter(s => !!s).join('') +
-                tmpl(segmentTemplate.initialization),
+              this.emit("item", {
+                url:
+                  baseURL.filter((s) => !!s).join("") +
+                  tmpl(segmentTemplate.initialization),
                 seq: seq,
                 init: true,
                 duration: 0,
               });
             }
             for (let { duration, repeat, time } of timeline) {
-              duration = duration / timescale * 1000;
+              duration = (duration / timescale) * 1000;
               repeat = repeat || 1;
               currtime = time || currtime;
               for (let i = 0; i < repeat; i++) {
-                this.emit('item', {
-                  url: baseURL.filter(s => !!s).join('') +
-                  tmpl(segmentTemplate.media),
+                this.emit("item", {
+                  url:
+                    baseURL.filter((s) => !!s).join("") +
+                    tmpl(segmentTemplate.media),
                   seq: seq++,
                   duration,
                 });
@@ -164,23 +169,23 @@ export default class DashMPDParser extends Writable implements Parser {
             }
           }
           if (gotSegments) {
-            this.emit('endearly');
+            this.emit("endearly");
             onEnd();
             this._parser.removeAllListeners();
-            this.removeAllListeners('finish');
+            this.removeAllListeners("finish");
           }
           break;
       }
     });
 
-    this._parser.on('text', (text) => {
-      if (lastTag === 'baseurl') {
+    this._parser.on("text", (text) => {
+      if (lastTag === "baseurl") {
         baseURL[treeLevel] = text;
         lastTag = null;
       }
     });
 
-    this.on('finish', onEnd);
+    this.on("finish", onEnd);
   }
 
   _write(chunk: Buffer, encoding: string, callback: () => void): void {

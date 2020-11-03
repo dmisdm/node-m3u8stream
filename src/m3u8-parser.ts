@@ -1,6 +1,5 @@
-import { Writable } from 'stream';
-import { Parser } from './parser';
-
+import { Writable } from "stream-browserify";
+import { Parser } from "./parser";
 
 /**
  * A very simple m3u8 playlist file parser that detects tags and segments.
@@ -14,14 +13,14 @@ export default class m3u8Parser extends Writable implements Parser {
 
   constructor() {
     super();
-    this._lastLine = '';
+    this._lastLine = "";
     this._seq = 0;
     this._nextItemDuration = null;
     this._nextItemRange = null;
     this._lastItemRangeEnd = 0;
-    this.on('finish', () => {
+    this.on("finish", () => {
       this._parseLine(this._lastLine);
-      this.emit('end');
+      this.emit("end");
     });
   }
 
@@ -37,7 +36,7 @@ export default class m3u8Parser extends Writable implements Parser {
 
   _parseRange(value: string) {
     if (!value) return null;
-    let svalue = value.split('@');
+    let svalue = value.split("@");
     let start = svalue[1] ? parseInt(svalue[1]) : this._lastItemRangeEnd + 1;
     let end = start + parseInt(svalue[0]) - 1;
     let range = { start, end };
@@ -50,22 +49,23 @@ export default class m3u8Parser extends Writable implements Parser {
     if (match) {
       // This is a tag.
       const tag = match[1];
-      const value = match[2] || '';
+      const value = match[2] || "";
       switch (tag) {
-        case 'EXT-X-PROGRAM-DATE-TIME':
-          this.emit('starttime', new Date(value).getTime());
+        case "EXT-X-PROGRAM-DATE-TIME":
+          this.emit("starttime", new Date(value).getTime());
           break;
-        case 'EXT-X-MEDIA-SEQUENCE':
+        case "EXT-X-MEDIA-SEQUENCE":
           this._seq = parseInt(value);
           break;
-        case 'EXT-X-MAP': {
+        case "EXT-X-MAP": {
           let attrs = this._parseAttrList(value);
           if (!attrs.URI) {
             this.destroy(
-              new Error('`EXT-X-MAP` found without required attribute `URI`'));
+              new Error("`EXT-X-MAP` found without required attribute `URI`")
+            );
             return;
           }
-          this.emit('item', {
+          this.emit("item", {
             url: attrs.URI,
             seq: this._seq,
             init: true,
@@ -74,22 +74,22 @@ export default class m3u8Parser extends Writable implements Parser {
           });
           break;
         }
-        case 'EXT-X-BYTERANGE': {
+        case "EXT-X-BYTERANGE": {
           this._nextItemRange = this._parseRange(value);
           break;
         }
-        case 'EXTINF':
-          this._nextItemDuration =
-            Math.round(parseFloat(value.split(',')[0]) * 1000);
+        case "EXTINF":
+          this._nextItemDuration = Math.round(
+            parseFloat(value.split(",")[0]) * 1000
+          );
           break;
-        case 'EXT-X-ENDLIST':
-          this.emit('endlist');
+        case "EXT-X-ENDLIST":
+          this.emit("endlist");
           break;
       }
-
     } else if (!/^#/.test(line) && line.trim()) {
       // This is a segment
-      this.emit('item', {
+      this.emit("item", {
         url: line.trim(),
         seq: this._seq++,
         duration: this._nextItemDuration,
@@ -100,8 +100,10 @@ export default class m3u8Parser extends Writable implements Parser {
   }
 
   _write(chunk: Buffer, encoding: string, callback: () => void): void {
-    let lines: string[] = chunk.toString('utf8').split('\n');
-    if (this._lastLine) { lines[0] = this._lastLine + lines[0]; }
+    let lines: string[] = chunk.toString("utf8").split("\n");
+    if (this._lastLine) {
+      lines[0] = this._lastLine + lines[0];
+    }
     lines.forEach((line: string, i: number) => {
       if (this.destroyed) return;
       if (i < lines.length - 1) {

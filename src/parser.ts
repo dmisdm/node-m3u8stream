@@ -1,4 +1,4 @@
-import { Writable } from 'stream';
+import { Writable } from "stream-browserify";
 
 export interface Item {
   url: string;
@@ -10,8 +10,8 @@ export interface Item {
 }
 
 export interface Parser extends Writable {
-  on(event: 'item', listener: (item: Item) => boolean): this;
+  on(event: "item", listener: (item: Item) => boolean): this;
   on(event: string | symbol, listener: (...args: any[]) => any): this;
-  emit(event: 'item', item: Item): boolean;
+  emit(event: "item", item: Item): boolean;
   emit(event: string, ...args: any[]): boolean;
 }
